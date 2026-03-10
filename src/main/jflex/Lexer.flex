@@ -1,28 +1,42 @@
 package org.comp;
 
+import java_cup.runtime.Symbol;
+
 %%
 
 %class Lexer
-%public
 %unicode
+%cup
 %line
 %column
-%type String
 
-DIGIT = [0-9]
-ID    = [a-zA-Z][a-zA-Z0-9]*
+%{
+
+private Symbol symbol(int type) {
+    return new Symbol(type, yyline, yycolumn);
+}
+
+private Symbol symbol(int type, Object value) {
+    return new Symbol(type, yyline, yycolumn, value);
+}
+
+%}
+
+NUMBER = [0-9]+
+WHITESPACE = [ \t\r\n]+
 
 %%
 
-"+"        { return "PLUS"; }
-"-"        { return "MINUS"; }
-"*"        { return "MULT"; }
-"/"        { return "DIV"; }
+{WHITESPACE}     { }
 
-{DIGIT}+   { return "INT(" + yytext() + ")"; }
+"+"              { return symbol(sym.PLUS); }
+"-"              { return symbol(sym.MINUS); }
+"*"              { return symbol(sym.TIMES); }
+"/"              { return symbol(sym.DIVIDE); }
 
-{ID}       { return "ID(" + yytext() + ")"; }
+"("              { return symbol(sym.LPAREN); }
+")"              { return symbol(sym.RPAREN); }
 
-[ \t\r\n]+ { /* skip whitespace */ }
+{NUMBER}         { return symbol(sym.NUMBER, Integer.parseInt(yytext())); }
 
-.          { return "UNKNOWN(" + yytext() + ")"; }
+<<EOF>>          { return symbol(sym.EOF); }

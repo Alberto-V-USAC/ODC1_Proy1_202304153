@@ -3,14 +3,16 @@ package org.comp;
 import java.io.StringReader;
 
 public class Main {
+
     public static void main(String[] args) throws Exception {
-        String input = "sum = a1 + 23 * value";
+
+        String input = "3 + 4 * (2 + 1)";
 
         Lexer lexer = new Lexer(new StringReader(input));
+        Parser parser = new Parser(lexer);
 
-        String token;
-        while ((token = lexer.yylex()) != null) {
-            System.out.println(token);
-        }
+        Object result = parser.parse().value;
+
+        System.out.println("Result = " + result);
     }
 }
