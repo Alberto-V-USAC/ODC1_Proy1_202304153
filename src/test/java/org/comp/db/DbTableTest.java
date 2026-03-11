@@ -77,4 +77,41 @@ class DbTableTest {
         );
         assertTrue(table.checkRecord(record4).isEmpty());
     }
+
+    @Test
+    void add() {
+        var table = new DbTable("table", basicSchema);
+
+        var error = table.add(HashMap.of(
+                "id", DbType.from_raw(1),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.add(HashMap.of(
+                "id", DbType.from_raw(2),
+                "foo", DbType.from_raw("this is more text"),
+                "bar", DbType.from_raw(13.0f),
+                "spam", DbType.from_raw(false)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.add(HashMap.of(
+                "id", DbType.from_raw(1),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.add(HashMap.of(
+                "id", DbType.from_raw(3),
+                "foo", DbType.from_raw("extra text"),
+                "bar", DbType.from_raw(420.0f),
+                "spam", DbType.from_raw(true)
+        ));
+        assertTrue(error.isEmpty());
+    }
 }
