@@ -15,7 +15,7 @@ class DbTableTest {
 
 
     @Test
-    void checkRecord() {
+    void checkRecordEquality() {
         var table = new DbTable("table", basicSchema);
 
         // Missing fields case
@@ -28,6 +28,67 @@ class DbTableTest {
                 table.checkRecord(record0).get(),
                 DbTable.RecordError.MissingField
         );
+
+        // Extra fields
+        HashMap<String, DbType> record1 = HashMap.of(
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false),
+                "extra", DbType.from_raw(67)
+        );
+        assertTrue(table.checkRecord(record1).isDefined());
+        assertEquals(
+                table.checkRecord(record1).get(),
+                DbTable.RecordError.ExtraFields
+        );
+
+        // Bad typing 1
+        HashMap<String, DbType> record2 = HashMap.of(
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42),
+                "spam", DbType.from_raw(false)
+        );
+        assertTrue(table.checkRecord(record2).isDefined());
+        assertEquals(
+                table.checkRecord(record2).get(),
+                DbTable.RecordError.BadTyping
+        );
+
+        // Bad typing 2
+        HashMap<String, DbType> record3 = HashMap.of(
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw(42),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
+        );
+        assertTrue(table.checkRecord(record3).isDefined());
+        assertEquals(
+                table.checkRecord(record3).get(),
+                DbTable.RecordError.BadTyping
+        );
+
+        // Correct case
+        HashMap<String, DbType> record4 = HashMap.of(
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
+        );
+        assertTrue(table.checkRecord(record4).isEmpty());
+    }
+
+    @Test
+    void checkRecord() {
+        var table = new DbTable("table", basicSchema);
+
+        // Missing fields case
+        HashMap<String, DbType> record0 = HashMap.of(
+                "id", DbType.from_raw(32),
+                "spam", DbType.from_raw(false)
+        );
+        assertTrue(table.checkRecord(record0, false).isEmpty());
 
         // Extra fields
         HashMap<String, DbType> record1 = HashMap.of(
@@ -108,6 +169,40 @@ class DbTableTest {
         assertTrue(error.isEmpty());
 
         error = table.add(HashMap.of(
+                "id", DbType.from_raw(3),
+                "foo", DbType.from_raw("extra text"),
+                "bar", DbType.from_raw(420.0f),
+                "spam", DbType.from_raw(true)
+        ));
+        assertTrue(error.isEmpty());
+    }
+
+    @Test
+    void addNullable() {
+        DbTable table = new DbTable("table", basicSchema);
+
+        var error = table.addNullable(HashMap.of(
+                "id", DbType.from_raw(1),
+                "foo", DbType.from_raw("this is text"),
+                "spam", DbType.from_raw(false)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.addNullable(HashMap.of(
+                "id", DbType.from_raw(2),
+                "foo", DbType.from_raw("this is more text"),
+                "bar", DbType.from_raw(13.0f)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.addNullable(HashMap.of(
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
+        ));
+        assertTrue(error.isEmpty());
+
+        error = table.addNullable(HashMap.of(
                 "id", DbType.from_raw(3),
                 "foo", DbType.from_raw("extra text"),
                 "bar", DbType.from_raw(420.0f),

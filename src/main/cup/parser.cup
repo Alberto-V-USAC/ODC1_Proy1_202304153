@@ -1,0 +1,301 @@
+package org.comp;
+
+import java.util.function.Predicate;
+import java_cup.runtime.Symbol;
+
+import io.vavr.collection.List;
+import io.vavr.collection.HashMap;
+import io.vavr.Tuple;
+import io.vavr.Tuple2;
+import io.vavr.Function1;
+import io.vavr.control.Either;
+import io.vavr.control.Option;
+
+import org.comp.db.DbManager;
+import org.comp.db.Database;
+import org.comp.db.DbType;
+
+
+parser code {:
+    public String LOG = "";
+    public String latestLOG = "";
+:};
+
+// Primitive-ish symbols
+terminal LPAREN, RPAREN, LBRACE, RBRACE, LBRACK, RBRACK;
+terminal NOT, EQEQ, NOTEQ, GT, LT, LEQ, GEQ, ANDAND, OROR;
+terminal SEMICOLON, COLON, COMMA;
+
+// Keywords
+terminal DATABASE, EXPORT, TABLE, READ, ADD, UPDATE, CLEAR;
+terminal INT_T, FLOAT_T, BOOL_T, STRING_T, ARRAY_T, OBJECT_T, NullLit;
+terminal USE, STORE_AT, SET, FIELDS, FILTER, STAR;
+
+// Literals
+terminal java.lang.Integer  IntegerLit;
+terminal java.lang.Float    FloatLit;
+terminal java.lang.Boolean  BoolLit;
+terminal java.lang.String   StringLit;
+
+terminal java.lang.String   Identifier;
+
+// Not so basic expressions
+nonterminal Function1<HashMap<String, DbType>, java.lang.Float> arith_expr;
+nonterminal Function1<HashMap<String, DbType>, java.lang.String> str_expr;
+
+// Comparisson expressions
+nonterminal Predicate<HashMap<java.lang.String, DbType>>    arith_cmp;
+nonterminal Predicate<HashMap<java.lang.String, DbType>>    str_cmp;
+nonterminal Predicate<HashMap<java.lang.String, DbType>>    logic_expr;
+
+nonterminal                                     add_record_stmt;
+nonterminal HashMap<String, DbType>             record_fields;
+nonterminal Tuple2<java.lang.String, DbType>    record_field_stmt;
+
+// Basic type expressions
+nonterminal DbType                  value_expr;
+nonterminal DbType                  primitive_expr;
+nonterminal DbType                  array_expr;
+nonterminal List<DbType>            array_content;
+nonterminal DbType                  obj_expr;
+nonterminal HashMap<String, DbType> obj_content;
+nonterminal Tuple2<String, DbType>  obj_entry;
+
+// Single thing statements
+nonterminal use_stmt;
+nonterminal export_stmt;
+nonterminal clear_stmt;
+
+// Operations statements
+nonterminal Either<Database, DbManager.DatabaseError>   database_stmt;
+nonterminal Tuple2<java.lang.String, Class<?>>          var_type_stmt;
+nonterminal HashMap<String, Class<?>>                   table_creation_content;
+nonterminal Option<Database.TableError>                 table_creation_stmt;
+nonterminal                                             read_stmt;
+nonterminal List<java.lang.String>                      read_fields;
+
+nonterminal dummy_stmt;
+nonterminal statements;
+
+// Precedence
+precedence left OROR;
+precedence left ANDAND;
+precedence nonassoc EQEQ, NOTEQ, GT, LT, LEQ, GEQ;
+precedence left NOT;
+
+
+start with statements;
+
+statements ::= dummy_stmt | dummy_stmt statements;
+dummy_stmt ::=
+    use_stmt
+    | export_stmt
+    | database_stmt
+    | table_creation_stmt
+    | add_record_stmt
+    | read_stmt
+    | clear_stmt;
+
+
+use_stmt ::= USE Identifier:i SEMICOLON
+    {:
+        var mng = DbManager.getInstance();
+        mng.setActiveDatabase(i);
+    :};
+
+export_stmt ::= EXPORT StringLit:s SEMICOLON
+    {:
+        DbManager.getInstance().getActiveDatabase().get().saveToJson(s);
+    :};
+
+database_stmt ::=
+    DATABASE Identifier:i LBRACE
+        STORE_AT StringLit:s SEMICOLON
+    RBRACE
+    {:
+        var mng = DbManager.getInstance();
+        RESULT = mng.createDatabase(i, s, true);
+    :};
+
+
+// Table Creation
+table_creation_stmt ::=
+    TABLE Identifier:i LBRACE
+        table_creation_content:s
+    RBRACE
+    {:
+        var maybeDb = DbManager.getInstance().getActiveDatabase();
+        if (maybeDb.isEmpty())
+            RESULT = Option.of(Database.TableError.TableNotFound);
+        else {
+            RESULT = maybeDb.get().addTable(i, s);
+        }
+    :};
+
+table_creation_content ::=
+    var_type_stmt:t
+        {: RESULT = HashMap.of(t._1(), t._2()); :}
+    | var_type_stmt:t table_creation_content:m
+        {: RESULT = m.put(t._1(), t._2()); :};
+
+var_type_stmt ::=
+    Identifier:v COLON INT_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.Integer.class); :}
+    | Identifier:v COLON FLOAT_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.Float.class); :}
+    | Identifier:v COLON BOOL_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.Bool.class); :}
+    | Identifier:v COLON STRING_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.String.class); :}
+    | Identifier:v COLON ARRAY_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.Array.class); :}
+    | Identifier:v COLON OBJECT_T SEMICOLON
+        {: RESULT = Tuple.of(v, DbType.DbObject.class); :};
+
+clear_stmt ::= CLEAR Identifier:i SEMICOLON
+    {:
+        DbManager.getInstance().getActiveDatabase().forEach(db -> {
+            db.dropTable(i);
+        });
+    :};
+
+
+// Add Record
+add_record_stmt ::=
+    ADD Identifier:i LBRACE
+        record_fields:m
+    RBRACE
+    {:
+        DbManager.getInstance().getActiveDatabase().forEach(db -> {
+            db.addRecord(i, m);
+        });
+    :};
+
+record_fields ::=
+    record_field_stmt:t
+        {: RESULT = HashMap.of(t._1(), t._2()); :}
+    | record_field_stmt:t COMMA record_fields:m
+        {: RESULT = m.put(t._1(), t._2()); :};
+
+record_field_stmt ::= Identifier:i COLON value_expr:v
+    {: RESULT = Tuple.of(i, v); :};
+
+
+value_expr ::=
+    primitive_expr:e
+        {: RESULT = e; :}
+    | array_expr:e
+        {: RESULT = e; :}
+    | obj_expr:e
+        {: RESULT = e; :};
+
+primitive_expr ::=
+    IntegerLit:i    {: RESULT = DbType.from_raw(i); :}
+    | FloatLit:f    {: RESULT = DbType.from_raw(f); :}
+    | BoolLit:b     {: RESULT = DbType.from_raw(b); :}
+    | StringLit:s   {: RESULT = DbType.from_raw(s); :};
+
+array_expr ::= LBRACK array_content:l RBRACK
+    {: RESULT = DbType.from_list(l); :};
+
+array_content ::=
+    value_expr:e
+        {: RESULT = List.of(e); :}
+    | value_expr:e COMMA array_content:l
+        {: RESULT = l.prepend(e); :};
+
+obj_expr ::= LBRACE obj_content:m RBRACE
+    {: RESULT = DbType.from_map(m); :};
+
+obj_content ::=
+    obj_entry:t
+        {: RESULT = HashMap.of(t); :}
+    | obj_entry:t COMMA obj_content:m
+        {: RESULT = m.put(t); :};
+
+obj_entry ::= Identifier:i COLON value_expr:e
+    {: RESULT = Tuple.of(i, e); :};
+
+
+// Read records
+read_stmt ::=
+    READ Identifier:t LBRACE
+        FIELDS COLON read_fields:l SEMICOLON
+        FILTER COLON logic_expr:f SEMICOLON
+    RBRACE
+    {:
+        var db = DbManager
+                .getInstance()
+                .getActiveDatabase()
+                .get();
+
+        var records = db
+                .readTable(t, f)
+                .getLeft();
+
+        String latest = "";
+        for (var rec : records) {
+            latest += db.formatRecord(t, rec, l);
+            parser.LOG += parser.latestLOG;
+        }
+        parser.latestLOG = latest;
+    :};
+
+
+read_fields ::=
+    | STAR              {: RESULT = List.empty(); :}
+    | Identifier:i      {: RESULT = List.of(i); :}
+    | Identifier:i COMMA read_fields:l
+        {: RESULT = l.append(i); :};
+
+// Logic
+logic_expr ::=
+    LPAREN logic_expr:e RPAREN
+        {: RESULT = (rec) -> e.test(rec); :}
+    | BoolLit:b
+        {: RESULT = (rec) -> b; :}
+    | arith_cmp:f
+        {: RESULT = (rec) -> f.test(rec); :}
+    | str_cmp:f
+        {: RESULT = (rec) -> f.test(rec); :}
+    | NOT logic_expr:e
+        {: RESULT = (rec) -> !e.test(rec); :}
+    | logic_expr:e1 ANDAND logic_expr:e2
+        {: RESULT = (rec) -> e1.test(rec) && e2.test(rec); :}
+    | logic_expr:e1 OROR logic_expr:e2
+        {: RESULT = (rec) -> e1.test(rec) || e2.test(rec); :}
+    | logic_expr:e1 EQEQ logic_expr:e2
+        {: RESULT = (rec) -> e1.test(rec) == e2.test(rec); :}
+    | logic_expr:e1 NOTEQ logic_expr:e2
+        {: RESULT = (rec) -> e1.test(rec) != e2.test(rec); :};
+
+
+arith_expr ::=
+    IntegerLit:i    {: RESULT = (rec) -> (float) i; :}
+    | FloatLit:f    {: RESULT = (rec) -> f; :}
+    | Identifier:i  {: RESULT = (rec) -> ((Number) rec.get(i).get().get()).floatValue(); :};
+
+arith_cmp ::=
+    arith_expr:e1 EQEQ arith_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec).equals(e2.apply(rec)); :}
+    | arith_expr:e1 NOTEQ arith_expr:e2
+        {: RESULT = (rec) -> !e1.apply(rec).equals(e2.apply(rec)); :}
+    | arith_expr:e1 GT arith_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec) > e2.apply(rec); :}
+    | arith_expr:e1 LT arith_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec) < e2.apply(rec); :}
+    | arith_expr:e1 GEQ arith_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec) >= e2.apply(rec); :}
+    | arith_expr:e1 LEQ arith_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec) <= e2.apply(rec); :};
+
+str_cmp ::=
+    str_expr:e1 EQEQ str_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec).equals(e2.apply(rec)); :}
+    | str_expr:e1 NOTEQ str_expr:e2
+        {: RESULT = (rec) -> e1.apply(rec).equals(e2.apply(rec)); :};
+
+// TODO: Fix this
+str_expr ::=
+    StringLit:s     {: RESULT = (rec) -> s; :};
+//    | Identifier:i  {: RESULT = (rec) -> (String) rec.get(i).get().get(); :};

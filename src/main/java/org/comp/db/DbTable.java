@@ -20,6 +20,13 @@ public class DbTable {
         ExtraFields,
     }
 
+    static UpdateError recordErrorToUpdateError(RecordError error) {
+        return switch(error) {
+            case RecordError.BadTyping -> UpdateError.BadTyping;
+            case RecordError.ExtraFields, RecordError.MissingField -> UpdateError.ExtraFields;
+        };
+    }
+
     String tableName;
     HashMap<String, Class<?>> schema;
     HashSet<HashMap<String, DbType>> records = HashSet.empty();
@@ -30,6 +37,10 @@ public class DbTable {
     }
 
     public Option<RecordError> checkRecord(HashMap<String, DbType> record) {
+        return checkRecord(record, true);
+    }
+
+    public Option<RecordError> checkRecord(HashMap<String, DbType> record, boolean checkEquality) {
         // Key validation by double contention
         // record.keys ⊆ schema.keys
         for (var key : record.keySet()) {
@@ -38,13 +49,15 @@ public class DbTable {
         }
 
         // schema.keys ⊆ record.keys
-        for (var key : schema.keySet()) {
-            if (!record.containsKey(key))
-                return Option.of(RecordError.MissingField);
+        if (checkEquality) {
+            for (var key : schema.keySet()) {
+                if (!record.containsKey(key))
+                    return Option.of(RecordError.MissingField);
+            }
         }
 
         // Now, check the correct typings
-        for (var key : schema.keySet()) {
+        for (var key : record.keySet()) {
             Class<?> classSchema = schema.get(key).get();
             Class<?> classRecord = record.get(key).get().getClass();
 
@@ -58,13 +71,21 @@ public class DbTable {
     public Option<RecordError> add(HashMap<String, DbType> record) {
         var maybeError = checkRecord(record);
 
-        if (checkRecord(record).isDefined())
-            return maybeError;
-        else {
+        if (maybeError.isEmpty())
             records = records.add(record);
-            return Option.none();
-        }
+
+        return maybeError;
     }
+
+    public Option<RecordError> addNullable(HashMap<String ,DbType> record) {
+        var maybeError = checkRecord(record, false);
+
+        if (maybeError.isEmpty())
+            records = records.add(record);
+
+        return maybeError;
+    }
+
 
     public HashSet<HashMap<String, DbType>> read() {
         return records;
@@ -84,18 +105,9 @@ public class DbTable {
             HashMap<String, DbType> newRecord,
             Predicate<HashMap<String, DbType>> filter
     ) {
-        // Need to check for contention but not equality
-        // record.keys ⊆ schema.keys
-        for (var key : newRecord.keySet()) {
-            if (!schema.containsKey(key))
-                return Option.of(UpdateError.ExtraFields);
-
-            Class<?> classSchema = schema.get(key).get();
-            Class<?> classRecord = newRecord.get(key).get().getClass();
-
-            if (classSchema != classRecord)
-                return Option.of(UpdateError.BadTyping);
-        }
+        var err = this.checkRecord(newRecord, false);
+        if (err.isDefined())
+            return err.map(DbTable::recordErrorToUpdateError);
 
         // Filter according to predicate
         records = records

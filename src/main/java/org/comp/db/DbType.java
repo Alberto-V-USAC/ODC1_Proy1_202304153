@@ -15,6 +15,25 @@ public sealed interface DbType permits
 {
     Object get();
 
+    default java.lang.String format() {
+        return switch (this) {
+            case DbType.Integer dbType -> java.lang.String.valueOf(dbType.inner);
+            case DbType.Float dbType -> java.lang.String.valueOf(dbType.inner);
+            case DbType.Bool dbType -> java.lang.String.valueOf(dbType.inner);
+            case DbType.String dbType -> dbType.inner;
+            case DbType.Array arr -> {
+                yield arr.inner
+                        .map(DbType::format)
+                        .mkString("[ ", ", ", " ]");
+            }
+            case DbType.DbObject obj -> {
+                yield obj.inner
+                        .map(entry -> entry._1() + " : " + entry._2().format())
+                        .mkString("\n");
+            }
+        };
+    }
+
     static Option<DbType> from_primitive(Object object) {
         return switch (object) {
             case java.lang.Integer ignored -> DbType.Integer.from(object).map(v -> v);
@@ -54,6 +73,18 @@ public sealed interface DbType permits
 
     static String from_raw(java.lang.String value) {
         return String.from_raw(value);
+    }
+
+    static Array from_list(List<DbType> list) {
+        Array array = new Array();
+        array.inner = list;
+        return array;
+    }
+
+    static DbObject from_map(HashMap<java.lang.String, DbType> map) {
+        DbObject object = new DbObject();
+        object.inner = map;
+        return object;
     }
 
     final class Integer implements DbType {
@@ -160,10 +191,10 @@ public sealed interface DbType permits
     }
 
     final class DbObject implements DbType {
-        HashMap<String, DbType> inner = HashMap.empty();
+        HashMap<java.lang.String, DbType> inner = HashMap.empty();
 
         @Override
-        public HashMap<String, DbType> get() {
+        public HashMap<java.lang.String, DbType> get() {
             return inner;
         }
     }
