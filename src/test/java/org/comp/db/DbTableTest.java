@@ -19,8 +19,8 @@ class DbTableTest {
 
         // Missing fields case
         HashMap<String, DbType> record0 = HashMap.of(
-                "id", DbType.Integer.from(32).get(),
-                "spam", DbType.Bool.from(false).get()
+                "id", DbType.from_raw(32),
+                "spam", DbType.from_raw(false)
         );
         assertTrue(table.checkRecord(record0).isDefined());
         assertEquals(
@@ -30,11 +30,11 @@ class DbTableTest {
 
         // Extra fields
         HashMap<String, DbType> record1 = HashMap.of(
-                "id", DbType.Integer.from(32).get(),
-                "foo", DbType.String.from("this is text").get(),
-                "bar", DbType.Float.from(42.0f).get(),
-                "spam", DbType.Bool.from(false).get(),
-                "extra", DbType.Integer.from(67).get()
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false),
+                "extra", DbType.from_raw(67)
         );
         assertTrue(table.checkRecord(record1).isDefined());
         assertEquals(
@@ -44,10 +44,10 @@ class DbTableTest {
 
         // Bad typing 1
         HashMap<String, DbType> record2 = HashMap.of(
-                "id", DbType.Integer.from(32).get(),
-                "foo", DbType.String.from("this is text").get(),
-                "bar", DbType.Integer.from(42).get(),
-                "spam", DbType.Bool.from(false).get()
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42),
+                "spam", DbType.from_raw(false)
         );
         assertTrue(table.checkRecord(record2).isDefined());
         assertEquals(
@@ -57,10 +57,10 @@ class DbTableTest {
 
         // Bad typing 2
         HashMap<String, DbType> record3 = HashMap.of(
-                "id", DbType.Integer.from(32).get(),
-                "foo", DbType.Integer.from(42).get(),
-                "bar", DbType.Float.from(42.0f).get(),
-                "spam", DbType.Bool.from(false).get()
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw(42),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
         );
         assertTrue(table.checkRecord(record3).isDefined());
         assertEquals(
@@ -70,10 +70,10 @@ class DbTableTest {
 
         // Correct case
         HashMap<String, DbType> record4 = HashMap.of(
-                "id", DbType.Integer.from(32).get(),
-                "foo", DbType.String.from("this is text").get(),
-                "bar", DbType.Float.from(42.0f).get(),
-                "spam", DbType.Bool.from(false).get()
+                "id", DbType.from_raw(32),
+                "foo", DbType.from_raw("this is text"),
+                "bar", DbType.from_raw(42.0f),
+                "spam", DbType.from_raw(false)
         );
         assertTrue(table.checkRecord(record4).isEmpty());
     }

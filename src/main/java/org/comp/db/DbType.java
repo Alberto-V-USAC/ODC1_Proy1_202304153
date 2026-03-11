@@ -40,12 +40,34 @@ public sealed interface DbType permits
         return Option.of(dbArray);
     }
 
+    static Integer from_raw(int value) {
+        return Integer.from_raw(value);
+    }
+
+    static Float from_raw(float value) {
+        return Float.from_raw(value);
+    }
+
+    static Bool from_raw(boolean value) {
+        return Bool.from_raw(value);
+    }
+
+    static String from_raw(java.lang.String value) {
+        return String.from_raw(value);
+    }
+
     final class Integer implements DbType {
         int inner;
 
         @Override
         public java.lang.Integer get() {
             return inner;
+        }
+
+        public static Integer from_raw(int value) {
+            var dbType = new DbType.Integer();
+            dbType.inner = value;
+            return dbType;
         }
 
         public static Option<Integer> from(Object object) {
@@ -64,6 +86,12 @@ public sealed interface DbType permits
         @Override
         public java.lang.Float get() {
             return inner;
+        }
+
+        public static Float from_raw(float value) {
+            var dbType = new DbType.Float();
+            dbType.inner = value;
+            return dbType;
         }
 
         public static Option<Float> from(Object object) {
@@ -91,6 +119,12 @@ public sealed interface DbType permits
             return inner;
         }
 
+        public static Bool from_raw(boolean value) {
+            var dbType = new DbType.Bool();
+            dbType.inner = value;
+            return dbType;
+        }
+
         public static Option<Bool> from(Object object) {
             if (object instanceof java.lang.Boolean) {
                 var dbType = new DbType.Bool();
@@ -107,6 +141,12 @@ public sealed interface DbType permits
         @Override
         public java.lang.String get() {
             return inner;
+        }
+
+        public static String from_raw(java.lang.String value) {
+            var dbType = new DbType.String();
+            dbType.inner = value;
+            return dbType;
         }
 
         public static Option<String> from(Object object) {
