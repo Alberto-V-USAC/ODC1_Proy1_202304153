@@ -17,13 +17,27 @@ public sealed interface DbType permits
 
     static Option<DbType> from_primitive(Object object) {
         return switch (object) {
-            case java.lang.Integer dbInt -> DbType.Integer.from(object).map(v -> v);
-            case java.lang.Float dbFloat -> DbType.Float.from(object).map(v -> v);
-            case java.lang.Double dbFloat -> DbType.Float.from(object).map(v -> v);
-            case java.lang.Boolean dbBool -> DbType.Bool.from(object).map(v -> v);
-            case java.lang.String dbString -> DbType.String.from(object).map(v -> v);
+            case java.lang.Integer ignored -> DbType.Integer.from(object).map(v -> v);
+            case java.lang.Float ignored -> DbType.Float.from(object).map(v -> v);
+            case java.lang.Double ignored -> DbType.Float.from(object).map(v -> v);
+            case java.lang.Boolean ignored -> DbType.Bool.from(object).map(v -> v);
+            case java.lang.String ignored -> DbType.String.from(object).map(v -> v);
             default -> Option.none();
         };
+    }
+
+    static Option<DbType.Array> from_array(Object[] arr) {
+        var dbArray = new Array();
+
+        for (Object obj : arr) {
+            var maybeDbType = from_primitive(obj);
+            if (maybeDbType.isEmpty())
+                return Option.none();
+
+            dbArray.inner = dbArray.inner.append(maybeDbType.get());
+        }
+
+        return Option.of(dbArray);
     }
 
     final class Integer implements DbType {
@@ -58,6 +72,13 @@ public sealed interface DbType permits
                 dbType.inner = (float) object;
                 return Option.of(dbType);
             }
+
+            if (object instanceof java.lang.Double) {
+                var dbType = new DbType.Float();
+                dbType.inner = (float) (double) object;
+                return Option.of(dbType);
+            }
+
             return Option.none();
         }
     }
@@ -113,6 +134,10 @@ public sealed interface DbType permits
         @Override
         public List<DbType> get() {
             return inner;
+        }
+
+        public List<Object> get_raw() {
+            return inner.map(DbType::get);
         }
     }
 }
