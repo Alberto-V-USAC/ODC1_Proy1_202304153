@@ -4,12 +4,20 @@ import io.vavr.collection.HashMap;
 import io.vavr.collection.HashSet;
 import io.vavr.control.Option;
 
+import java.util.function.Predicate;
+
 
 public class DbTable {
     public enum RecordError {
         BadTyping,
         ExtraFields,
         MissingField,
+    }
+
+    public enum UpdateError {
+        BadTyping,
+        BadFilter,
+        ExtraFields,
     }
 
     String tableName;
@@ -56,6 +64,44 @@ public class DbTable {
             records = records.add(record);
             return Option.none();
         }
+    }
+
+    public HashSet<HashMap<String, DbType>> read() {
+        return records;
+    }
+
+    public HashSet<HashMap<String, DbType>> read(
+            Predicate<HashMap<String, DbType>> filter
+    ) {
+        return records.filter(filter);
+    }
+
+    public Option<UpdateError> update(HashMap<String, DbType> newRecord) {
+        return update(newRecord, ignored -> true);
+    }
+
+    public Option<UpdateError> update(
+            HashMap<String, DbType> newRecord,
+            Predicate<HashMap<String, DbType>> filter
+    ) {
+        // Need to check for contention but not equality
+        // record.keys ⊆ schema.keys
+        for (var key : newRecord.keySet()) {
+            if (!schema.containsKey(key))
+                return Option.of(UpdateError.ExtraFields);
+
+            Class<?> classSchema = schema.get(key).get();
+            Class<?> classRecord = newRecord.get(key).get().getClass();
+
+            if (classSchema != classRecord)
+                return Option.of(UpdateError.BadTyping);
+        }
+
+        // Filter according to predicate
+        records = records
+                .map(rec -> filter.test(rec) ? rec.merge(newRecord, (v1, v2) -> v2) : rec);
+
+        return Option.none();
     }
 
     public void clear() {
