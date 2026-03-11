@@ -26,6 +26,12 @@
             <artifactId>java-cup-runtime</artifactId>
             <version>11b-20160615-3</version>
         </dependency>
+
+        <dependency>
+            <groupId>io.vavr</groupId>
+            <artifactId>vavr</artifactId>
+            <version>1.0.0</version>
+        </dependency>
     </dependencies>
 
     <build>
